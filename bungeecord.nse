@@ -85,6 +85,13 @@ function read_status(connection)
 end
 
 function test_bungee(connection)
+  pcall(function()
+    local packet = PacketBuffer:new()
+    packet:writevarint(0)
+    packet:writestring('')
+    connection:writebuffer(packet)
+  end)
+
   local response = connection:readbuffer()
   if response:readvarint() ~= 0 then
     error('Received invalid disconnect packet.')
@@ -133,8 +140,8 @@ function PacketBuffer:readvarint()
   local result, part = 0, 0
   for i = 0, 4 do
     part = string.byte(self:read(1))
-    result = bit32.bor(result, bit32.lshift(bit32.band(part, 0x7F), 7 * i))
-    if bit32.band(part, 0x80) == 0 then
+    result = result | (part & 0x7F) << 7 * i
+    if part & 0x80 == 0 then
       return result
     end
   end
@@ -144,12 +151,12 @@ end
 function PacketBuffer:writevarint(value)
   local remaining = value
   for i = 0, 4 do
-    if bit32.band(remaining, bit32.bnot(0x7F)) == 0 then
-      self:write(bin.pack('>C', remaining))
+    if remaining & ~0x7F == 0 then
+      self:write(string.pack('>B', remaining))
       return
     end
-    self:write(bin.pack('>C', bit32.bor(bit32.band(remaining, 0x7F), 0x80)))
-    remaining = bit32.rshift(remaining, 7)
+    self:write(string.pack('>B', remaining & 0x7F | 0x80))
+    remaining = remaining >> 7
   end
   error(string.format('The value %d is too big to send in a varint', value))
 end
@@ -165,11 +172,11 @@ function PacketBuffer:writestring(value)
 end
 
 function PacketBuffer:readshort()
-  return string.unpack(">s", self:read(2))
+  return string.unpack(">h", self:read(2))
 end
 
 function PacketBuffer:writeshort(value)
-  self:write(bin.pack(">s", value))
+  self:write(string.pack(">h", value))
 end
 
 function PacketBuffer:readint()
@@ -177,7 +184,7 @@ function PacketBuffer:readint()
 end
 
 function PacketBuffer:writeint(value)
-  self:write(bin.pack(">i", value))
+  self:write(string.pack(">i", value))
 end
 
 function PacketBuffer:readlong()
@@ -185,7 +192,7 @@ function PacketBuffer:readlong()
 end
 
 function PacketBuffer:writelong(value)
-  self:write(bin.pack(">l", value))
+  self:write(string.pack(">l", value))
 end
 
 function PacketBuffer:readbuffer()

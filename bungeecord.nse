@@ -21,6 +21,7 @@ categories = {"default", "safe", "vuln"}
 -- |   status: BungeeCord backend detected
 -- |   motd: A Minecraft Server
 -- |   version: Spigot 1.10.2
+-- |   players: 0/100
 -- |_  address: 127.0.0.1:25565
 
 
@@ -31,14 +32,14 @@ action = function(host, port)
 
   local status, result = pcall(function()
     local connection
-    socket:set_timeout(5000)
+    socket:set_timeout(2500)
     assert(socket:connect(host, port))
     connection = Connection:new(socket)
     handshake(connection, 47, 1)
     response = read_status(connection)
     socket:close()
 
-    socket:set_timeout(5000)
+    socket:set_timeout(2500)
     assert(socket:connect(host, port))
     connection = Connection:new(socket)
     handshake(connection, response.version.protocol, 2)
@@ -48,6 +49,7 @@ action = function(host, port)
       result.status = 'BungeeCord backend detected'
       result.motd = response.description.text or response.description
       result.version = response.version.name
+      result.players = response.players.online .. '/' .. response.players.max
       result.address = host.ip .. ':' .. port.number
       return result
     end
@@ -85,13 +87,6 @@ function read_status(connection)
 end
 
 function test_bungee(connection)
-  pcall(function()
-    local packet = PacketBuffer:new()
-    packet:writevarint(0)
-    packet:writestring('')
-    connection:writebuffer(packet)
-  end)
-
   local response = connection:readbuffer()
   if response:readvarint() ~= 0 then
     error('Received invalid disconnect packet.')
